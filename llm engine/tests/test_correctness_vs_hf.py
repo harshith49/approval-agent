@@ -76,3 +76,38 @@ def test_loading_failure_preserves_context(monkeypatch):
     monkeypatch.setattr(weights.GPT2Config, 'from_pretrained', offline)
     with pytest.raises(OSError, match='network unavailable'):
         load_model(EngineConfig(device='cpu'))
+
+
+@pytest.mark.parametrize('prompt', PROMPTS)
+def test_public_gpt2_greedy_50_tokens(public_models, prompt):
+    from engine.generate import generate
+
+    model, reference, tokenizer = public_models
+    ids = tokenizer(prompt, return_tensors='pt')['input_ids']
+    actual = generate(model, ids, 50)
+    with torch.inference_mode():
+        expected = reference.generate(ids, attention_mask=torch.ones_like(ids),
+            max_new_tokens=50, do_sample=False, use_cache=False, eos_token_id=None,
+            pad_token_id=tokenizer.eos_token_id)
+    assert expected.shape[1] == ids.shape[1] + 50
+    assert torch.equal(actual, expected)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA hardware unavailable')
+def test_public_gpt2_cuda_parity(public_models):
+    from engine.generate import generate
+    model, reference, tokenizer = public_models
+    ids = tokenizer(PROMPTS[0], return_tensors='pt')['input_ids'].to('cuda')
+    try:
+        model.to('cuda')
+        reference.to('cuda')
+        with torch.inference_mode():
+            torch.testing.assert_close(model(ids), reference(ids, use_cache=False).logits,
+                                       atol=1e-4, rtol=1e-4)
+            expected = reference.generate(ids, attention_mask=torch.ones_like(ids),
+                max_new_tokens=50, do_sample=False, use_cache=False, eos_token_id=None,
+                pad_token_id=tokenizer.eos_token_id)
+        assert torch.equal(generate(model, ids, 50), expected)
+    finally:
+        model.cpu()
+        reference.cpu()

@@ -75,13 +75,16 @@ class GPT2Model(nn.Module):
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.lm_head.weight = self.token_embedding.weight
 
-    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def validate_input_ids(self, input_ids: torch.Tensor) -> None:
+        """Validate tokens even when generation requests zero new tokens."""
         if input_ids.ndim != 2 or input_ids.dtype != torch.long:
             raise ValueError("input_ids must be a rank-2 torch.long tensor")
         if input_ids.shape[0] == 0 or not 0 < input_ids.shape[1] <= self.config.max_positions:
             raise ValueError("input_ids requires a nonempty batch and sequence within context limit")
         if torch.any(input_ids < 0) or torch.any(input_ids >= self.config.vocab_size):
             raise ValueError("input_ids contains a token outside the vocabulary")
+    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+        self.validate_input_ids(input_ids)
         positions = torch.arange(input_ids.shape[1], device=input_ids.device)
         x = self.token_embedding(input_ids) + self.position_embedding(positions)
         for block in self.blocks:
