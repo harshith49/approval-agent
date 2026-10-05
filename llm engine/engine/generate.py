@@ -1,4 +1,4 @@
-"""Baseline generation: recompute the full sequence on every decoding step."""
+"""Greedy generation with an uncached baseline and per-request KV caching."""
 import argparse
 import time
 
@@ -64,7 +64,7 @@ def generate(model: GPT2Model, input_ids: torch.Tensor, max_new_tokens: int,
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="mini-infer: uncached GPT-2 generation")
+    parser = argparse.ArgumentParser(description="mini-infer: GPT-2 generation with optional KV cache")
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--use-cache", action="store_true", help="Prefill once, then decode with KV cache")
     parser.add_argument("--max-new-tokens", type=int, default=50)
