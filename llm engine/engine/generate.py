@@ -53,7 +53,11 @@ def main() -> None:
                           eos_token_id=tokenizer.eos_token_id)
     except ValueError as error:
         parser.error(str(error))
-    print(tokenizer.decode(output[0].tolist(), skip_special_tokens=True))
+    # Preserve user text verbatim, including literal special-token spellings.
+    # Only newly generated special tokens (including the terminal EOS) are hidden.
+    new_ids = output[0, ids.shape[1]:].tolist()
+    continuation = tokenizer.decode(new_ids, skip_special_tokens=True) if new_ids else ""
+    print(args.prompt + continuation)
 
 
 if __name__ == "__main__":

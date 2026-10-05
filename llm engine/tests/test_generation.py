@@ -74,4 +74,40 @@ def test_cli_empty_prompt_uses_eos_seed(model, monkeypatch, capsys):
     monkeypatch.setattr(sys, 'argv', ['mini-infer', '--prompt', '', '--max-new-tokens', '0',
                                      '--device', 'cpu'])
     cli.main()
-    assert capsys.readouterr().out.strip() == 'seed=2'
+    assert capsys.readouterr().out == '\n'
+
+
+def test_cli_zero_tokens_preserves_literal_special_token(monkeypatch, capsys):
+    from engine import generate as cli
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained('gpt2', cache_dir='model_cache')
+    model = GPT2Model(ModelConfig(vocab_size=50257, max_positions=16, hidden_size=24,
+                                 num_layers=1, num_heads=4, intermediate_size=96)).eval()
+    prompt = 'Hello <|endoftext|> world'
+    monkeypatch.setattr(cli, 'load_model', lambda config: (model, tokenizer))
+    monkeypatch.setattr(sys, 'argv', ['mini-infer', '--prompt', prompt,
+                                     '--max-new-tokens', '0', '--device', 'cpu'])
+    cli.main()
+    assert capsys.readouterr().out == prompt + '\n'
+
+
+def test_cli_empty_prompt_first_forward_uses_eos(model, monkeypatch, capsys):
+    from engine import generate as cli
+    seen = []
+    hook = model.register_forward_pre_hook(lambda module, args: seen.append(args[0].tolist()))
+
+    class Tokenizer:
+        eos_token_id = 2
+
+        def decode(self, ids, *, skip_special_tokens):
+            return ','.join(str(i) for i in ids)
+
+    monkeypatch.setattr(cli, 'load_model', lambda config: (model, Tokenizer()))
+    monkeypatch.setattr(sys, 'argv', ['mini-infer', '--prompt', '', '--max-new-tokens', '1'])
+    try:
+        cli.main()
+    finally:
+        hook.remove()
+    assert seen == [[[2]]]
+    capsys.readouterr()

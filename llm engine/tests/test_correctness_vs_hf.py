@@ -62,8 +62,9 @@ def test_bad_checkpoint_does_not_partially_modify_model(failure):
     else:
         state[key] = torch.zeros(1, 1)
     before = model.token_embedding.weight.detach().clone()
-    with pytest.raises(ValueError, match=key.replace('.', r'\.')):
+    with pytest.raises(ValueError, match=key.replace('.', r'\.')) as error:
         copy_hf_weights(model, state)
+    assert 'expected' in str(error.value)
     torch.testing.assert_close(model.token_embedding.weight, before, atol=0, rtol=0)
 
 
@@ -111,3 +112,21 @@ def test_public_gpt2_cuda_parity(public_models):
     finally:
         model.cpu()
         reference.cpu()
+
+
+def test_loading_incomplete_checkpoint_rejects_random_fallback(tmp_path, public_models):
+    from safetensors.torch import load_file, save_file
+
+    _, _, tokenizer = public_models
+    checkpoint = tmp_path / 'damaged-gpt2'
+    reference = GPT2LMHeadModel(GPT2Config(vocab_size=37, n_positions=16, n_embd=24,
+                                          n_layer=2, n_head=4))
+    reference.save_pretrained(checkpoint)
+    tokenizer.save_pretrained(checkpoint)
+    path = checkpoint / 'model.safetensors'
+    state = load_file(path)
+    missing_key = 'transformer.h.1.mlp.c_proj.weight'
+    del state[missing_key]
+    save_file(state, path, metadata={'format': 'pt'})
+    with pytest.raises(ValueError, match=missing_key.replace('.', r'\.')):
+        load_model(EngineConfig(device='cpu', model_name=str(checkpoint)))

@@ -46,7 +46,8 @@ def copy_hf_weights(model: GPT2Model, state_dict: Mapping[str, torch.Tensor]) ->
     for name, parameter in model.named_parameters():
         key, transpose = mapping[name]
         if key not in state_dict:
-            raise ValueError(f"Missing checkpoint tensor: {key}")
+            expected_shape = tuple(parameter.T.shape if transpose else parameter.shape)
+            raise ValueError(f"Missing checkpoint tensor: {key}; expected shape {expected_shape}")
         source = state_dict[key]
         if transpose:
             source = source.T
@@ -74,8 +75,18 @@ def load_model(config: EngineConfig) -> tuple[GPT2Model, PreTrainedTokenizerBase
         layer_norm_epsilon=hf_config.layer_norm_epsilon,
         activation_function=hf_config.activation_function)
     tokenizer = AutoTokenizer.from_pretrained(config.model_name, cache_dir=config.cache_dir)
-    reference = GPT2LMHeadModel.from_pretrained(config.model_name, config=hf_config,
-        cache_dir=config.cache_dir, torch_dtype=torch.float32, attn_implementation="eager")
+    reference, loading_info = GPT2LMHeadModel.from_pretrained(
+        config.model_name, config=hf_config, cache_dir=config.cache_dir,
+        torch_dtype=torch.float32, attn_implementation="eager", output_loading_info=True)
+    # HF fills absent parameters with random values. Inspect its diagnostics
+    # before state_dict() makes those synthesized values look like real weights.
+    if loading_info["missing_keys"]:
+        shapes = reference.state_dict()
+        missing = "; ".join(f"{key}: expected shape {tuple(shapes[key].shape)}"
+                            for key in loading_info["missing_keys"])
+        raise ValueError(f"Incomplete checkpoint: {missing}")
+    if loading_info["mismatched_keys"] or loading_info["error_msgs"]:
+        raise ValueError(f"Invalid checkpoint: {loading_info}")
     model = GPT2Model(model_config)
     copy_hf_weights(model, reference.state_dict())
     del reference
