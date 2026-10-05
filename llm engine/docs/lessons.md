@@ -13,3 +13,22 @@
 - **CPU demo:** `python -m engine.generate --prompt 'Hello, world!' --max-new-tokens 50 --device cpu` produced a continuation successfully. An offline run with `OMP_NUM_THREADS=1` also succeeded. Thread tuning here is a practical development setting, not a benchmark claim.
 
 CUDA parity is unverified: this machine exposes no CUDA device. No throughput, latency, or memory benchmark is published yet. KV cache, batching, paging, quantization, serving, Docker, CI, and Colab work remain for subsequent milestones.
+
+### Final independent review
+
+The reviewer independently reran the original suite (41 passed, one CUDA skip) and found two observable bugs:
+
+- **HF can hide missing weights:** `from_pretrained()` fills omitted checkpoint tensors with random values, so validating its resulting `state_dict()` alone is insufficient. A real damaged safetensors checkpoint reproduced the acceptance bug. The loader now inspects `output_loading_info` and rejects missing required keys before copying; diagnostics include expected tensor shapes. A normally omitted duplicate tied output-head weight remains legitimate. The direct mapper also reports the expected shape for missing tensors.
+- **Decoding can alter a prompt:** decoding the full sequence with `skip_special_tokens=True` removed literal `<|endoftext|>` text supplied by the user, even for zero new tokens. A real-tokenizer CLI test reproduced this. The CLI now preserves original prompt text and decodes only newly generated IDs. A tiny real-forward check separately verifies the empty-prompt seed.
+
+All regression failures were observed before their fixes. After fixes: **44 passed, one CUDA skip**, all three logit errors remained 0, and the CPU CLI preserved `Hello <|endoftext|> world` with zero new tokens. Safetensors 0.8.0 is now pinned because the on-disk regression directly imports it. The damaged-checkpoint test intentionally triggers HF's missing-weight diagnostic before our rejection.
+
+### Execution decisions
+
+- Kept the explicitly requested directory and used a local feature branch instead of moving to another checkout. A later relocation would need path changes.
+- Kept the execution ledger in this project's ignored scratch directory, avoiding writes to unrelated parent-project tooling. Generic parent-workspace tooling will not discover that ledger automatically.
+- Scoped pytest to this project; parent repository tests are outside this engine's validation.
+- Used HF eager attention as the FP32 oracle; optional fused backends and CUDA still need their own hardware validation.
+- Shared token validation between forward and generation so zero-token requests are validated without a redundant forward; this adds one small model method to maintain.
+
+Later milestones and CUDA execution remain outside this review. Full output-budget reservation, the eager reference, legitimate tied-head omission, and preserved download exceptions follow the approved scope. No review findings remain deferred. Work stays on `codex/mini-infer-m1` without merging or pushing.
