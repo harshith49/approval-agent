@@ -130,3 +130,40 @@ def test_loading_incomplete_checkpoint_rejects_random_fallback(tmp_path, public_
     save_file(state, path, metadata={'format': 'pt'})
     with pytest.raises(ValueError, match=missing_key.replace('.', r'\.')):
         load_model(EngineConfig(device='cpu', model_name=str(checkpoint)))
+
+
+@pytest.mark.parametrize('prompt', PROMPTS)
+def test_public_gpt2_cached_greedy_50_tokens(public_models, prompt):
+    from engine.generate import generate
+
+    model, reference, tokenizer = public_models
+    ids = tokenizer(prompt, return_tensors='pt')['input_ids']
+    cached = generate(model, ids, 50, use_cache=True)
+    baseline = generate(model, ids, 50)
+    with torch.inference_mode():
+        expected = reference.generate(ids, attention_mask=torch.ones_like(ids),
+            max_new_tokens=50, do_sample=False, use_cache=False, eos_token_id=None,
+            pad_token_id=tokenizer.eos_token_id)
+    assert torch.equal(cached, baseline)
+    assert torch.equal(cached, expected)
+
+
+@pytest.mark.parametrize('prompt', PROMPTS)
+@torch.inference_mode()
+def test_public_gpt2_cached_suffix_logits(public_models, prompt):
+    from engine.kv_cache import SimpleKVCache
+
+    model, _, tokenizer = public_models
+    ids = tokenizer(prompt, return_tensors='pt')['input_ids']
+    expected = model(ids)
+    for chunks in [[1] * ids.shape[1], [1, ids.shape[1] - 1]]:
+        cache = SimpleKVCache(model.config, batch_size=1, capacity=ids.shape[1],
+                              device=torch.device('cpu'), dtype=torch.float32)
+        offset = 0
+        for size in chunks:
+            actual = model(ids[:, offset:offset + size], cache=cache)
+            error = (actual - expected[:, offset:offset + size]).abs().max().item()
+            print(f'cached suffix max absolute error: {error:.9g}')
+            torch.testing.assert_close(actual, expected[:, offset:offset + size],
+                                       atol=1e-4, rtol=1e-4)
+            offset += size
