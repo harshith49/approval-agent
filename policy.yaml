@@ -1,0 +1,8 @@
+tools:
+  lookup_order:
+    rule: never
+  refund_order:
+    rule: always
+  send_email:
+    rule: conditional
+    external_domain: company.com
