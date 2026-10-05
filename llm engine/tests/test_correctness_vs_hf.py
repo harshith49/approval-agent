@@ -109,6 +109,7 @@ def test_public_gpt2_cuda_parity(public_models):
                 max_new_tokens=50, do_sample=False, use_cache=False, eos_token_id=None,
                 pad_token_id=tokenizer.eos_token_id)
         assert torch.equal(generate(model, ids, 50), expected)
+        assert torch.equal(generate(model, ids, 50, use_cache=True), expected)
     finally:
         model.cpu()
         reference.cpu()

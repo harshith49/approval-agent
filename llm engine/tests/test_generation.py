@@ -158,3 +158,21 @@ def test_zero_output_does_not_allocate_or_forward(model, monkeypatch):
     monkeypatch.setattr(module, 'SimpleKVCache', forbidden)
     monkeypatch.setattr(model, 'forward', forbidden)
     assert generate(model, torch.tensor([[1]]), 0, use_cache=True).tolist() == [[1]]
+
+
+@pytest.mark.parametrize('use_cache', [False, True])
+def test_previous_logits_released_before_next_forward(model, use_cache):
+    import weakref
+
+    references = []
+    released = []
+    before = model.register_forward_pre_hook(
+        lambda module, args: released.append(not references or references[-1]() is None))
+    after = model.register_forward_hook(
+        lambda module, args, output: references.append(weakref.ref(output)))
+    try:
+        generate(model, torch.tensor([[1, 2, 3]]), 4, use_cache=use_cache)
+    finally:
+        before.remove()
+        after.remove()
+    assert released == [True, True, True, True]

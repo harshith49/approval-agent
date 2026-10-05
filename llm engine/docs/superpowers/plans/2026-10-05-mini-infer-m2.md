@@ -79,8 +79,8 @@
 - [x] Implement benchmark and CSV writing with standard-library tools. Before timing both stages, assert token equality on the same input/output workload. Reject prompt/output lengths beyond context capacity, nonpositive output/thread counts, repetitions below three, or missing prompt lengths. Record actual device/hardware and CPU thread count; keep allocation included in total request timing.
 - [x] Run `HF_HUB_OFFLINE=1 .venv/bin/python -m benchmarks.bench_stages --device cpu`; inspect all eight CSV rows (two stages by four lengths) and retain measured results regardless of which stage wins. Check output parity before accepting any row.
 - [x] Update README with measured CPU results and commands; show prefill/decode in Mermaid; document reserved versus used cache memory, actual bugs, and limitations. Clearly retain unmeasured GPU placeholders. Do not imply synthetic workload results predict production traffic.
-- [ ] Run the full suite, cached CLI demo, `python -m compileall -q engine benchmarks`, and `git diff --check`. Request one independent read-only final review under the retained native workflow. Fix important findings with reproducing tests and a green full suite; record any deferrals honestly.
-- [ ] Commit with `bench: measure naive versus cached GPT-2 on CPU`, push the verified milestone to `origin/codex/mini-infer-m1`, and confirm local/remote HEAD match. No merge or force push.
+- [x] Run the full suite, cached CLI demo, `python -m compileall -q engine benchmarks`, and `git diff --check`. Request one independent read-only final review under the retained native workflow. Fix important findings with reproducing tests and a green full suite; record any deferrals honestly.
+- [x] Commit with `bench: measure naive versus cached GPT-2 on CPU`, push the verified milestone to `origin/codex/mini-infer-m1`, and confirm local/remote HEAD match. No merge or force push.
 
 ## Plan self-review
 

@@ -77,8 +77,8 @@ Run the same suite after every later milestone. Preserve this uncached baseline 
 
 | Stage | CPU measurements | GPU measurements | Status |
 |---|---|---|---|
-| Naive GPT-2 | 14.55 tokens/s | Not measured | Implemented and checked on CPU |
-| KV cache | 108.81 tokens/s | Not measured | Implemented and checked on CPU |
+| Naive GPT-2 | 14.56 tokens/s | Not measured | Implemented and checked on CPU |
+| KV cache | 108.49 tokens/s | Not measured | Implemented and checked on CPU |
 | Static batching | Not measured | Not measured | Planned |
 | Continuous batching | Not measured | Not measured | Planned |
 | Paged KV | Not measured | Not measured | Planned |
@@ -88,10 +88,10 @@ Representative stage values above use **128 prompt tokens + 32 generated tokens*
 
 | Prompt tokens | CPU naive tokens/s | CPU cached tokens/s | Throughput ratio | Reserved cache MiB |
 |---|---|---|---|---|
-| 16 | 39.47 | 131.05 | 3.32× | 3.38 |
-| 64 | 23.84 | 121.45 | 5.09× | 6.75 |
-| 128 | 14.55 | 108.81 | 7.48× | 11.25 |
-| 256 | 7.17 | 86.41 | 12.06× | 20.25 |
+| 16 | 38.47 | 130.01 | 3.38× | 3.38 |
+| 64 | 23.89 | 120.79 | 5.06× | 6.75 |
+| 128 | 14.56 | 108.49 | 7.45× | 11.25 |
+| 256 | 7.06 | 86.20 | 12.21× | 20.25 |
 
 Full measurements: [results/kv_cache.csv](results/kv_cache.csv), including time to first token, decode p50/p95, hardware, and thread counts. First-token times stay similar because both modes must process the prompt. CPU peak process memory is **unmeasured**, not inferred from the cache size. GPU values remain unmeasured.
 

@@ -51,6 +51,9 @@ def generate(model: GPT2Model, input_ids: torch.Tensor, max_new_tokens: int,
         current = output[:, -1:] if use_cache and step > 0 else output
         logits = model(current, cache=cache) if use_cache else model(current)
         token = greedy(logits[:, -1, :])
+        # Only token IDs survive the step; retaining full logits doubles overlap
+        # with the next forward, especially for a long uncached prefix.
+        del logits
         output = torch.cat((output, token[:, None]), dim=1)
         if step_times is not None:
             if device.type == "cuda":
